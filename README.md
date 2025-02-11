@@ -49,6 +49,24 @@ If you're using OpenAI, you can customize your model and API URL by adding the f
 > export OPENAI_BASE_URL="..." # Default to None
 ```
 
+## Configuration
+
+Put the following in ~/.bash_profile when you use bash:
+
+```bash
+eval "$(wut --activate-shell bash)"
+```
+
+Put the following in ~/.zshrc when you use zsh:
+```zsh
+eval "$(wut --activate-shell zsh)"
+```
+
+Put the following in ~/.config/fish/config.fish when you use fish:
+```fish
+wut --activate-shell fish | source
+```
+
 ## Usage
 
 `wut` must be used inside a `tmux` or `screen` session to capture the last command's output. To use it, just type `wut` after running a command:

@@ -1,5 +1,6 @@
-# Standard library
+# Sttndard library
 import os
+import re
 import tempfile
 from collections import namedtuple
 from subprocess import check_output, run, CalledProcessError, DEVNULL
@@ -28,6 +29,11 @@ Command = namedtuple("Command", ["text", "output"])
 #########
 # HELPERS
 #########
+
+
+def remove_ansi_escape_sequences(text: str) -> str:
+    ansi_escape_pattern = re.compile(r"\x1B\[[0-?9;]*[mK]")
+    return ansi_escape_pattern.sub("", text)
 
 
 def count_chars(text: str) -> int:
@@ -107,7 +113,7 @@ def get_shell_prompt(shell_name: str, shell_path: str) -> Optional[str]:
         elif shell_name in ["pwsh", "powershell"]:
             cmd = [shell_path, "-c", "Write-Host $prompt"]
             shell_prompt = check_output(cmd, text=True, stderr=DEVNULL)
-    except:
+    except CalledProcessError:
         shell_prompt = None
 
     return shell_prompt.strip() if shell_prompt else None
@@ -124,8 +130,8 @@ def get_pane_output() -> str:
                 cmd = [
                     "tmux",
                     "capture-pane",
-                    "-p",
-                    "-S",
+                    "-p",  # print to stdout
+                    "-S",  # start of history
                     # f"-{MAX_HISTORY_LINES}",
                     "-",
                 ]
@@ -139,7 +145,7 @@ def get_pane_output() -> str:
 
             with open(output_file, "r", encoding="utf-8", errors="replace") as f:
                 output = f.read()
-    except CalledProcessError as e:
+    except CalledProcessError:
         pass
 
     if output_file:
@@ -157,7 +163,6 @@ def get_commands(pane_output: str, shell: Shell) -> List[Command]:
     for line in reversed(pane_output.splitlines()):
         if not line.strip():
             continue
-
         if shell.prompt.lower() in line.lower():
             command_text = line.split(shell.prompt, 1)[1].strip()
             command = Command(command_text, "\n".join(reversed(buffer)).strip())
@@ -167,6 +172,11 @@ def get_commands(pane_output: str, shell: Shell) -> List[Command]:
 
         buffer.append(line)
 
+    # print("Commands:")
+    # for command in commands:
+    #     print(f"{command.text=}")
+    #     print(f"{command.output=}")
+    #     print()
     return commands[1:]  # Exclude the wut command itself
 
 
@@ -282,9 +292,12 @@ def get_llm_provider() -> str:
 ######
 
 
-def get_shell() -> Shell:
+def get_shell(prompt_string: Optional[str]) -> Shell:
     name, path = get_shell_name_and_path()
-    prompt = get_shell_prompt(name, path)
+    if prompt_string:
+        prompt = prompt_string
+    else:
+        prompt = get_shell_prompt(name, path)
     return Shell(path, name, prompt)  # NOTE: Could all be null values
 
 
@@ -293,29 +306,29 @@ def get_terminal_context(shell: Shell) -> str:
     if not pane_output:
         return "<terminal_history>No terminal output found.</terminal_history>"
 
-    if not shell.prompt:
-        # W/o the prompt, we can't reliably separate commands in terminal output
-        pane_output = truncate_pane_output(pane_output)
-        context = f"<terminal_history>\n{pane_output}\n</terminal_history>"
-    else:
+    if shell.prompt:
         commands = get_commands(pane_output, shell)
         commands = truncate_commands(commands[:MAX_COMMANDS])
         commands = list(reversed(commands))  # Order: Oldest to newest
 
-        previous_commands = commands[:-1]
-        last_command = commands[-1]
+        if 0 < len(commands):
+            previous_commands = commands[:-1]
+            last_command = commands[-1]
 
-        context = "<terminal_history>\n"
-        context += "<previous_commands>\n"
-        context += "\n".join(
-            command_to_string(c, shell.prompt) for c in previous_commands
-        )
-        context += "\n</previous_commands>\n"
-        context += "\n<last_command>\n"
-        context += command_to_string(last_command, shell.prompt)
-        context += "\n</last_command>"
-        context += "\n</terminal_history>"
-
+            context = "<terminal_history>\n"
+            context += "<previous_commands>\n"
+            context += "\n".join(
+                command_to_string(c, shell.prompt) for c in previous_commands
+            )
+            context += "\n</previous_commands>\n"
+            context += "\n<last_command>\n"
+            context += command_to_string(last_command, shell.prompt)
+            context += "\n</last_command>"
+            context += "\n</terminal_history>"
+            return context
+    # W/o the prompt, we can't reliably separate commands in terminal output
+    pane_output = truncate_pane_output(pane_output)
+    context = f"<terminal_history>\n{pane_output}\n</terminal_history>"
     return context
 
 

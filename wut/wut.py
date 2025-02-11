@@ -10,6 +10,7 @@ from wut.utils import (
     get_shell,
     get_terminal_context,
     explain,
+    remove_ansi_escape_sequences,
 )
 
 # from utils import (
@@ -17,6 +18,19 @@ from wut.utils import (
 #     get_terminal_context,
 #     explain,
 # )
+
+
+def print_activate_script(shell):
+    if shell == "bash":
+        print("ERROR: Sorry. bash is not supported yet.", file=sys.stderr)
+    elif shell == "zsh":
+        print("alias wut='\\wut --prompt=\"$(print -P $PS1)\" $@'")
+    elif shell == "fish":
+        print("ERROR: Sorry. fish is not supported yet.", file=sys.stderr)
+    else:
+        print(
+            "wut only supports bash, zsh, and fish. Please specify one of these shells."
+        )
 
 
 def main():
@@ -35,9 +49,26 @@ def main():
         action="store_true",
         help="Print debug information.",
     )
+    parser.add_argument(
+        "--activate-shell",
+        type=str,
+        required=False,
+        help="Print a shell script to eval in your shell to activate wut.",
+    )
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        required=False,
+        help="The shell prompt string. If not provided, wut will attempt to detect it.",
+    )
     args = parser.parse_args()
+    if args.activate_shell:
+        print_activate_script(args.activate_shell)
+        return
     console = Console()
     debug = lambda text: console.print(f"wut | {text}") if args.debug else None
+    if args.prompt:
+        args.prompt = remove_ansi_escape_sequences(args.prompt)
 
     with console.status("[bold green]Trying my best..."):
         # Ensure environment is set up correctly
@@ -57,7 +88,7 @@ def main():
             return
 
         # Gather context
-        shell = get_shell()
+        shell = get_shell(args.prompt)
         terminal_context = get_terminal_context(shell)
 
         debug(f"Retrieved shell information:\n{shell}")
