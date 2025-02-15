@@ -22,7 +22,7 @@ from wut.utils import (
 
 def print_activate_script(shell):
     if shell == "bash":
-        print("ERROR: Sorry. bash is not supported yet.", file=sys.stderr)
+        print("alias wut='wut --prompt=\"$(echo $PS1)\" $@'")
     elif shell == "zsh":
         print("alias wut='\\wut --prompt=\"$(print -P $PS1)\" $@'")
     elif shell == "fish":
@@ -99,3 +99,5 @@ def main():
         response = explain(terminal_context, args.query)
 
     console.print(response)
+
+
