@@ -22,7 +22,7 @@ from wut.utils import (
 
 def print_activate_script(shell):
     if shell == "bash":
-        print("alias wut='wut --prompt=\"$(echo $PS1)\" $@'")
+        print("alias wut='\\wut --prompt=\"$(echo ${PS1@P})\" $@'")  # NOTE: This works only in bash 4.4+
     elif shell == "zsh":
         print("alias wut='\\wut --prompt=\"$(print -P $PS1)\" $@'")
     elif shell == "fish":
