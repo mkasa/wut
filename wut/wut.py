@@ -2,7 +2,7 @@
 import os
 import argparse
 import logging
-from openai import RateLimitError, AuthenticationError
+from openai import RateLimitError, AuthenticationError, NotFoundError
 
 # Third party
 from rich.console import Console
@@ -103,6 +103,11 @@ def main():
         except AuthenticationError as e:
             console.print("[bold red]ERROR: Authentication error.[/bold red]")
             console.print("    [green]" + e.body["message"] + "[/green]")
+            return
+        except NotFoundError as e:
+            console.print("[bold red]ERROR: Not found error.[/bold red]")
+            console.print("    [green]" + e.body["message"] + "[/green]")
+            console.print("    If you are using Azure OpenAI, please ensure that you have set the correct endpoint.")
             return
 
     console.print(response)
