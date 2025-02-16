@@ -1,6 +1,7 @@
 # Standard library
 import os
 import argparse
+import logging
 from openai import RateLimitError, AuthenticationError
 
 # Third party
@@ -62,6 +63,8 @@ def main():
         return
     console = Console()
     debug = lambda text: console.print(f"wut | {text}") if args.debug else None
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
     if args.prompt:
         args.prompt = remove_ansi_escape_sequences(args.prompt)
 

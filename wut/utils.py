@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 # Third party
 from ollama import chat
 from psutil import Process
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 from anthropic import Anthropic
 from rich.markdown import Markdown
 
@@ -263,6 +263,28 @@ def run_openai(system_message: str, user_message: str) -> str:
     return response.choices[0].message.content
 
 
+def run_azure(system_message: str, user_message: str) -> str:
+    api_version = os.getenv("AZURE_API_VERSION", None) or "2024-06-01"
+    azure_endpoint = os.getenv("AZURE_ENDPOINT", None) or os.getenv("AZURE_API_BASE", None)
+    if azure_endpoint is None:
+        raise ValueError("You must set either AZURE_API_BASE or AZURE_ENDPOINT.\ne.g. export AZURE_API_BASE=https://<your resource name>.openai.azure.com/")
+    azure = AzureOpenAI(
+        api_key=os.getenv("AZURE_API_KEY", None),
+        azure_endpoint=azure_endpoint,
+        api_version=api_version
+    )
+
+    response = azure.chat.completions.create(
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+        model=os.getenv("AZURE_MODEL", None) or "gpt-4o",
+        temperature=0.7,
+    )
+    return response.choices[0].message.content
+
+
 def run_ollama(system_message: str, user_message: str) -> str:
     response = chat(
         model=os.getenv("OLLAMA_MODEL", None),
@@ -275,6 +297,9 @@ def run_ollama(system_message: str, user_message: str) -> str:
 
 
 def get_llm_provider() -> str:
+    if os.getenv("AZURE_API_KEY", None):
+        return "azure"
+
     if os.getenv("OPENAI_API_KEY", None):  # Default
         return "openai"
 
@@ -349,6 +374,8 @@ def explain(context: str, query: Optional[str] = None) -> str:
         call_llm = run_anthropic
     elif provider == "ollama":
         call_llm = run_ollama
+    elif provider == "azure":
+        call_llm = run_azure
 
     output = call_llm(system_message, user_message)
     return format_output(output)
