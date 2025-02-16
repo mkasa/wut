@@ -1,6 +1,7 @@
 # Standard library
 import os
 import argparse
+from openai import RateLimitError, AuthenticationError
 
 # Third party
 from rich.console import Console
@@ -12,12 +13,6 @@ from wut.utils import (
     explain,
     remove_ansi_escape_sequences,
 )
-
-# from utils import (
-#     get_shell,
-#     get_terminal_context,
-#     explain,
-# )
 
 
 def print_activate_script(shell):
@@ -95,8 +90,17 @@ def main():
         debug(f"Retrieved terminal context:\n{terminal_context}")
         debug("Sending request to LLM...")
 
-        # Get response
-        response = explain(terminal_context, args.query)
+        try:
+            # Get response
+            response = explain(terminal_context, args.query)
+        except RateLimitError as e:
+            console.print("[bold red]ERROR: Rate limit exceeded.[/bold red]")
+            console.print("    [green]" + e.body["message"] + "[/green]")
+            return
+        except AuthenticationError as e:
+            console.print("[bold red]ERROR: Authentication error.[/bold red]")
+            console.print("    [green]" + e.body["message"] + "[/green]")
+            return
 
     console.print(response)
 
