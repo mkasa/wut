@@ -231,12 +231,35 @@ def command_to_string(command: Command, shell_prompt: Optional[str] = None) -> s
 
 
 def format_output(output: str) -> str:
-    return Markdown(
-        output,
-        code_theme="monokai",
-        inline_code_lexer="python",
-        inline_code_theme="monokai",
-    )
+    # Try using glow if available
+    try:
+        env = os.environ.copy()
+        env["CLICOLOR_FORCE"] = "1"
+        
+        cmd = ["glow"]
+        
+        # Check for custom style file
+        style_file = os.path.expanduser("~/.local/share/asc/ggpt_glow_style.json")
+        if os.path.exists(style_file):
+            cmd.extend(["--style", style_file])
+        
+        result = run(
+            cmd,
+            input=output,
+            text=True,
+            capture_output=True,
+            check=True,
+            env=env
+        )
+        return result.stdout
+    except (CalledProcessError, FileNotFoundError):
+        # Fall back to Rich.Markdown
+        return Markdown(
+            output,
+            code_theme="monokai",
+            inline_code_lexer="python",
+            inline_code_theme="monokai",
+        )
 
 
 def run_anthropic(system_message: str, user_message: str) -> str:

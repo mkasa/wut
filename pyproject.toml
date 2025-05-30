@@ -1,6 +1,6 @@
 [project]
 name = "wut-cli"
-version = "0.2.0"
+version = "0.3.0"
 requires-python = ">=3.13"
 description = "CLI that explains the output of your last command. Forked from shobrook/wut."
 authors = [
