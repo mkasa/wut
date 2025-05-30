@@ -238,6 +238,15 @@ def format_output(output: str) -> str:
         
         cmd = ["glow"]
         
+        # Set width to terminal width - 2
+        try:
+            import shutil
+            terminal_width = shutil.get_terminal_size().columns
+            width = max(40, terminal_width - 2)  # Minimum width of 40
+            cmd.extend(["-w", str(width)])
+        except:
+            pass  # If we can't get terminal size, use glow's default
+        
         # Check for custom style file
         style_file = os.path.expanduser("~/.local/share/asc/ggpt_glow_style.json")
         if os.path.exists(style_file):

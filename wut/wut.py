@@ -110,6 +110,11 @@ def main():
             console.print("    If you are using Azure OpenAI, please ensure that you have set the correct endpoint.")
             return
 
-    console.print(response)
+    if isinstance(response, str):
+        # Response from glow with ANSI codes - print directly
+        print(response, end='')
+    else:
+        # Rich Markdown object - use console.print
+        console.print(response)
 
 
