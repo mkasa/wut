@@ -42,6 +42,14 @@ You can also use a local model with Ollama. Just add the model name that's being
 > export OLLAMA_MODEL="..."
 ```
 
+Alternatively, you can use Perplexity by installing the [Perplexity CLI](https://github.com/dawid-szewc/perplexity-cli) and setting your API key:
+
+```bash
+> curl -s https://raw.githubusercontent.com/dawid-szewc/perplexity-cli/main/perplexity.py > ~/.local/bin/perplexity
+> chmod +x ~/.local/bin/perplexity
+> export PERPLEXITY_API_KEY="..."
+```
+
 If you're using OpenAI, you can customize your model and API URL by adding the following to your environment:
 
 ```bash
@@ -93,6 +101,14 @@ If you have a _specific question_ about your last command, you can include a que
 > brew install pip
 ...
 > wut "how do i add this to my PATH variable?"
+```
+
+To use Perplexity instead of your default LLM provider, add the `-p` flag:
+
+```bash
+> git create-pr
+git: 'create-pr' is not a git command.
+> wut -p
 ```
 
 ## Roadmap
