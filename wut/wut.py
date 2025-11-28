@@ -57,6 +57,12 @@ def main():
         required=False,
         help="The shell prompt string. If not provided, wut will attempt to detect it.",
     )
+    parser.add_argument(
+        "-p",
+        "--perplexity",
+        action="store_true",
+        help="Use Perplexity CLI instead of the configured LLM provider.",
+    )
     args = parser.parse_args()
     if args.activate_shell:
         print_activate_script(args.activate_shell)
@@ -76,7 +82,8 @@ def main():
             )
             return
         if (
-            not os.environ.get("OPENAI_API_KEY", None)
+            not args.perplexity
+            and not os.environ.get("OPENAI_API_KEY", None)
             and not os.environ.get("ANTHROPIC_API_KEY", None)
             and not os.environ.get("OLLAMA_MODEL", None)
         ):
@@ -95,7 +102,7 @@ def main():
 
         try:
             # Get response
-            response = explain(terminal_context, args.query)
+            response = explain(terminal_context, args.query, use_perplexity=args.perplexity)
         except RateLimitError as e:
             console.print("[bold red]ERROR: Rate limit exceeded.[/bold red]")
             console.print("    [green]" + e.body["message"] + "[/green]")
@@ -108,6 +115,9 @@ def main():
             console.print("[bold red]ERROR: Not found error.[/bold red]")
             console.print("    [green]" + e.body["message"] + "[/green]")
             console.print("    If you are using Azure OpenAI, please ensure that you have set the correct endpoint.")
+            return
+        except RuntimeError as e:
+            console.print(f"[bold red]ERROR: {str(e)}[/bold red]")
             return
 
     if isinstance(response, str):

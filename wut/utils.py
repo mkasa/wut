@@ -328,6 +328,25 @@ def run_ollama(system_message: str, user_message: str) -> str:
     return response.message.content
 
 
+def run_perplexity(system_message: str, user_message: str) -> str:
+    """Call the external perplexity CLI with the query."""
+    # Combine system and user messages into a single query
+    query = f"{system_message}\n\n{user_message}"
+
+    try:
+        result = run(
+            ["perplexity", "-c", query],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except CalledProcessError as e:
+        raise RuntimeError(f"Perplexity CLI failed: {e.stderr}")
+    except FileNotFoundError:
+        raise RuntimeError("Perplexity CLI not found. Please ensure 'perplexity' is installed and in your PATH.")
+
+
 def get_llm_provider() -> str:
     if os.getenv("AZURE_API_KEY", None):
         return "azure"
@@ -396,10 +415,14 @@ def build_query(context: str, query: Optional[str] = None) -> str:
     return f"{context}\n\n{query}"
 
 
-def explain(context: str, query: Optional[str] = None) -> str:
+def explain(context: str, query: Optional[str] = None, use_perplexity: bool = False) -> str:
     system_message = EXPLAIN_PROMPT if not query else ANSWER_PROMPT
     user_message = build_query(context, query)
-    provider = get_llm_provider()
+
+    if use_perplexity:
+        provider = "perplexity"
+    else:
+        provider = get_llm_provider()
 
     call_llm = run_openai
     if provider == "anthropic":
@@ -408,6 +431,8 @@ def explain(context: str, query: Optional[str] = None) -> str:
         call_llm = run_ollama
     elif provider == "azure":
         call_llm = run_azure
+    elif provider == "perplexity":
+        call_llm = run_perplexity
 
     output = call_llm(system_message, user_message)
     return format_output(output)
