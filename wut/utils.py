@@ -32,7 +32,15 @@ Command = namedtuple("Command", ["text", "output"])
 
 
 def remove_ansi_escape_sequences(text: str) -> str:
-    ansi_escape_pattern = re.compile(r"\x1B\[[0-?9;]*[mK]")
+    # Strip CSI sequences (any final byte, not just `m`/`K`), OSC sequences (e.g.
+    # window-title changes that some prompts emit), and other two-byte escapes.
+    # Prompts and pane output can contain any of these, and a single leftover
+    # byte is enough to break prompt matching.
+    ansi_escape_pattern = re.compile(
+        r"\x1B\[[0-?]*[ -/]*[@-~]"  # CSI ... final byte
+        r"|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)"  # OSC ... BEL or ST
+        r"|\x1B[@-_]"  # other Fe escapes
+    )
     return ansi_escape_pattern.sub("", text)
 
 
@@ -116,7 +124,9 @@ def get_shell_prompt(shell_name: str, shell_path: str) -> Optional[str]:
     except CalledProcessError:
         shell_prompt = None
 
-    return shell_prompt.strip() if shell_prompt else None
+    if not shell_prompt:
+        return None
+    return remove_ansi_escape_sequences(shell_prompt).strip()
 
 
 def get_pane_output() -> str:
@@ -151,20 +161,87 @@ def get_pane_output() -> str:
     if output_file:
         os.remove(output_file)
 
-    return output
+    # tmux strips colors already, but `screen` (and `tmux -e`) can leave escape
+    # sequences behind; normalize so prompt matching sees the same plain text.
+    return remove_ansi_escape_sequences(output)
+
+
+def get_git_branch() -> Optional[str]:
+    try:
+        branch = check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            text=True,
+            stderr=DEVNULL,
+        ).strip()
+        return branch or None
+    except (CalledProcessError, FileNotFoundError):
+        return None
+
+
+def build_prompt_regex(prompt: Optional[str]) -> Optional["re.Pattern"]:
+    """Turn a concrete, fully-expanded prompt into a regex that still matches
+    when the volatile parts differ from the moment `wut` was invoked.
+
+    The prompt captured by the shell alias reflects the *current* working
+    directory and git status, so an exact substring search misses any prompt
+    that was rendered in a different directory or git state. We wildcard those
+    volatile values (cwd and git branch) and keep everything else — username,
+    host, fixed decorations, the trailing sigil — literal so we don't match
+    arbitrary output lines.
+    """
+    if not prompt or not prompt.strip():
+        return None
+
+    prompt = prompt.strip()
+
+    # Values that change from one prompt to the next within a single session.
+    cwd = os.getcwd()
+    home = os.path.expanduser("~")
+    dynamic = [cwd, os.path.basename(cwd)]
+    if home and cwd.startswith(home):
+        dynamic.append("~" + cwd[len(home):])
+    if branch := get_git_branch():
+        dynamic.append(branch)
+
+    pattern = re.escape(prompt)
+    # Replace longer values first so a full path is wildcarded before its basename.
+    for value in sorted({v for v in dynamic if v}, key=len, reverse=True):
+        pattern = pattern.replace(re.escape(value), ".*?")
+
+    pattern = re.sub(r"(?:\.\*\?)+", ".*?", pattern)  # collapse adjacent wildcards
+    pattern = re.sub(r"(?:\\ )+", r"\\s+", pattern)  # tolerate whitespace changes
+    # Merge wildcards separated only by whitespace so a git segment that appears
+    # or disappears between prompts doesn't change how many tokens we expect.
+    pattern = re.sub(r"\.\*\?(?:\\s\+\.\*\?)+", ".*?", pattern)
+
+    # Bail out if nothing literal survives (e.g. the prompt is just the cwd); a
+    # pattern of only wildcards would match every line and mangle the output.
+    if not re.sub(r"\.\*\?|\\s\+", "", pattern).strip():
+        return None
+
+    try:
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return None
 
 
 def get_commands(pane_output: str, shell: Shell) -> List[Command]:
     # TODO: Handle edge cases. E.g. if you change the shell prompt in the middle of a session,
     # only the latest prompt will be used to split the pane output into `Command` objects.
 
+    matcher = build_prompt_regex(shell.prompt)
+    if matcher is None:
+        return []
+
     commands = []  # Order: newest to oldest
     buffer = []
     for line in reversed(pane_output.splitlines()):
         if not line.strip():
             continue
-        if shell.prompt.lower() in line.lower():
-            command_text = line.split(shell.prompt, 1)[1].strip()
+
+        match = matcher.match(line)
+        if match:
+            command_text = line[match.end():].strip()
             command = Command(command_text, "\n".join(reversed(buffer)).strip())
             commands.append(command)
             buffer = []
@@ -172,11 +249,6 @@ def get_commands(pane_output: str, shell: Shell) -> List[Command]:
 
         buffer.append(line)
 
-    # print("Commands:")
-    # for command in commands:
-    #     print(f"{command.text=}")
-    #     print(f"{command.output=}")
-    #     print()
     return commands[1:]  # Exclude the wut command itself
 
 
