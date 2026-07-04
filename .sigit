@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "repo": "default",
+      "category": "Python",
+      "template_set": "venv_autoenv_zsh",
+      "files": [
+        {
+          "src": ".autoenv.zsh",
+          "dst": ".autoenv.zsh",
+          "commit": "e881dda49242c9c668b239c6790c901a1174dee4",
+          "sha256": "14cd77d9a661000e174edad02c9923f81670161430cc7e91292a61ab30aec184"
+        },
+        {
+          "src": ".autoenv_leave.zsh",
+          "dst": ".autoenv_leave.zsh",
+          "commit": "dc6efb0d235f40da5979004ef0e38b1c82ca7b98",
+          "sha256": "c7cdcd039aa7b907f104d392bc89aa9445fd330f7b11c5b79167fb1d5f2d4747"
+        }
+      ]
+    }
+  ]
+}
