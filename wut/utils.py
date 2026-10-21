@@ -362,7 +362,7 @@ def run_openai(system_message: str, user_message: str) -> str:
             {"role": "user", "content": user_message},
         ],
         model=os.getenv("OPENAI_MODEL", None) or "gpt-4o",
-        temperature=0.7,
+        temperature=1.0,
     )
     return response.choices[0].message.content
 
@@ -384,7 +384,7 @@ def run_azure(system_message: str, user_message: str) -> str:
             {"role": "user", "content": user_message},
         ],
         model=os.getenv("AZURE_MODEL", None) or "gpt-4o",
-        temperature=0.7,
+        temperature=1.0,
     )
     return response.choices[0].message.content
 
