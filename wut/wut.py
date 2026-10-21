@@ -2,18 +2,29 @@
 import os
 import argparse
 import logging
-from openai import RateLimitError, AuthenticationError, NotFoundError
+from openai import APIConnectionError, APIError, RateLimitError, AuthenticationError, NotFoundError
 
 # Third party
 from rich.console import Console
+from rich.markup import escape
 
 # Local
 from wut.utils import (
     get_shell,
     get_terminal_context,
     explain,
+    get_llm_provider,
     remove_ansi_escape_sequences,
 )
+
+
+def error_message(e: APIError) -> str:
+    body = e.body
+    if isinstance(body, dict):
+        body = body.get("error", body)
+        if isinstance(body, dict) and body.get("message"):
+            return str(body["message"])
+    return e.message
 
 
 def print_activate_script(shell):
@@ -84,6 +95,7 @@ def main():
         if (
             not args.perplexity
             and not os.environ.get("OPENAI_API_KEY", None)
+            and not os.environ.get("AZURE_API_KEY", None)
             and not os.environ.get("ANTHROPIC_API_KEY", None)
             and not os.environ.get("OLLAMA_MODEL", None)
         ):
@@ -105,19 +117,30 @@ def main():
             response = explain(terminal_context, args.query, use_perplexity=args.perplexity)
         except RateLimitError as e:
             console.print("[bold red]ERROR: Rate limit exceeded.[/bold red]")
-            console.print("    [green]" + e.body["message"] + "[/green]")
+            console.print("    [green]" + escape(error_message(e)) + "[/green]")
             return
         except AuthenticationError as e:
+            key_var = "AZURE_API_KEY" if get_llm_provider() == "azure" else "OPENAI_API_KEY"
             console.print("[bold red]ERROR: Authentication error.[/bold red]")
-            console.print("    [green]" + e.body["message"] + "[/green]")
+            console.print("    [green]" + escape(error_message(e)) + "[/green]")
+            console.print(f"    Your API key appears to be invalid. Please check {key_var}.")
             return
         except NotFoundError as e:
             console.print("[bold red]ERROR: Not found error.[/bold red]")
-            console.print("    [green]" + e.body["message"] + "[/green]")
+            console.print("    [green]" + escape(error_message(e)) + "[/green]")
             console.print("    If you are using Azure OpenAI, please ensure that you have set the correct endpoint.")
             return
-        except RuntimeError as e:
-            console.print(f"[bold red]ERROR: {str(e)}[/bold red]")
+        except APIConnectionError as e:
+            console.print("[bold red]ERROR: Could not connect to the API.[/bold red]")
+            console.print("    [green]" + escape(str(e)) + "[/green]")
+            console.print("    Please check your network and endpoint settings (OPENAI_BASE_URL / AZURE_ENDPOINT).")
+            return
+        except APIError as e:
+            console.print("[bold red]ERROR: API error.[/bold red]")
+            console.print("    [green]" + escape(error_message(e)) + "[/green]")
+            return
+        except (RuntimeError, ValueError) as e:
+            console.print(f"[bold red]ERROR: {escape(str(e))}[/bold red]")
             return
 
     if isinstance(response, str):

@@ -354,7 +354,19 @@ def run_anthropic(system_message: str, user_message: str) -> str:
     return response.content[0].text
 
 
+def check_api_key(env_var: str) -> None:
+    """Reject API keys that are obviously not real, before sending a request."""
+    value = os.getenv(env_var, None) or ""
+    if value.strip().startswith("op://"):
+        raise RuntimeError(
+            f"{env_var} contains a 1Password secret reference ({value.strip()}), not a real key.\n"
+            f"Please replace it with the actual API key, e.g. run wut via `op run -- wut` "
+            f"or export {env_var}=\"$(op read '{value.strip()}')\"."
+        )
+
+
 def run_openai(system_message: str, user_message: str) -> str:
+    check_api_key("OPENAI_API_KEY")
     openai = OpenAI(base_url=os.getenv("OPENAI_BASE_URL", None))
     response = openai.chat.completions.create(
         messages=[
@@ -368,6 +380,7 @@ def run_openai(system_message: str, user_message: str) -> str:
 
 
 def run_azure(system_message: str, user_message: str) -> str:
+    check_api_key("AZURE_API_KEY")
     api_version = os.getenv("AZURE_API_VERSION", None) or "2024-06-01"
     azure_endpoint = os.getenv("AZURE_ENDPOINT", None) or os.getenv("AZURE_API_BASE", None)
     if azure_endpoint is None:
